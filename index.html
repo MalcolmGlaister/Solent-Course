@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#071522">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Solent Course">
+  <title>Solent Course</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Solent Course</h1>
+      <p>Fast race-course entry and next-mark navigation</p>
+    </div>
+    <button id="installBtn" class="secondary hidden">Install</button>
+  </header>
+
+  <main>
+    <section id="setupView" class="panel">
+      <label for="courseInput">Course codes</label>
+      <textarea id="courseInput" rows="3" placeholder="Example: 4W 3U(S) 4E 3G"></textarea>
+      <div class="hint">Separate codes with spaces, commas or dashes. Add <b>(P)</b> or <b>(S)</b> for rounding.</div>
+
+      <div class="buttonRow">
+        <button id="parseBtn">Build course</button>
+        <button id="clearBtn" class="secondary">Clear</button>
+      </div>
+
+      <div id="messages" aria-live="polite"></div>
+      <ol id="courseList" class="courseList"></ol>
+
+      <div class="settingsGrid">
+        <label>Default rounding
+          <select id="defaultRounding">
+            <option value="P">Port</option>
+            <option value="S">Starboard</option>
+            <option value="">Unspecified</option>
+          </select>
+        </label>
+        <label>Auto-advance radius
+          <select id="autoRadius">
+            <option value="0">Off</option>
+            <option value="25">25 m</option>
+            <option value="50" selected>50 m</option>
+            <option value="75">75 m</option>
+            <option value="100">100 m</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="buttonRow">
+        <button id="startBtn" disabled>Start course</button>
+        <button id="saveBtn" class="secondary" disabled>Save</button>
+      </div>
+
+      <details>
+        <summary>Saved courses</summary>
+        <div id="savedCourses"></div>
+      </details>
+
+      <details>
+        <summary>Find a mark</summary>
+        <input id="markSearch" type="search" placeholder="Code or name">
+        <div id="markResults" class="markResults"></div>
+      </details>
+    </section>
+
+    <section id="raceView" class="panel hidden">
+      <div class="raceTop">
+        <button id="backToSetup" class="secondary compact">Edit</button>
+        <div id="gpsStatus" class="status">Waiting for GPS…</div>
+        <button id="wakeBtn" class="secondary compact">Keep awake</button>
+      </div>
+
+      <div class="nextLabel">NEXT MARK</div>
+      <div id="nextCode" class="nextCode">—</div>
+      <div id="nextName" class="nextName">—</div>
+      <div id="roundingBadge" class="roundingBadge">—</div>
+
+      <div class="metrics">
+        <div class="metric">
+          <span>BEARING TRUE</span>
+          <strong id="bearing">—</strong>
+        </div>
+        <div class="metric">
+          <span>DISTANCE</span>
+          <strong id="distance">—</strong>
+        </div>
+        <div class="metric">
+          <span>SMG TO MARK</span>
+          <strong id="smg">—</strong>
+        </div>
+        <div class="metric">
+          <span>ETA</span>
+          <strong id="eta">—</strong>
+        </div>
+      </div>
+
+      <div class="legInfo">
+        <span id="legCounter">Leg —</span>
+        <span id="gpsDetail">No GPS fix</span>
+      </div>
+
+      <div class="raceButtons">
+        <button id="prevBtn" class="secondary">◀ Previous</button>
+        <button id="nextBtn">Next mark ▶</button>
+      </div>
+
+      <button id="useDemoBtn" class="secondary full">Use demo position near Cowes</button>
+      <div class="warning">Race aid only. Keep a proper lookout and use official charts and sailing instructions.</div>
+    </section>
+  </main>
+
+  <script src="marks.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

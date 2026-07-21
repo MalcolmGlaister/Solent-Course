@@ -1,0 +1,18 @@
+{
+  "name": "Solent Course",
+  "short_name": "Solent Course",
+  "description": "Offline Solent yacht-racing course entry and next-mark navigation.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#071522",
+  "theme_color": "#071522",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

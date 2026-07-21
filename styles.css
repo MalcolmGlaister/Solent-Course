@@ -1,0 +1,76 @@
+
+:root {
+  color-scheme: dark;
+  --bg: #071522;
+  --panel: #0d2233;
+  --panel2: #102b40;
+  --text: #f5f8fb;
+  --muted: #9db1c2;
+  --accent: #f4b942;
+  --danger: #ff6b6b;
+  --ok: #6de0a5;
+  --border: #24445c;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+header { display: flex; justify-content: space-between; align-items: center; padding: 18px 16px 10px; max-width: 760px; margin: auto; }
+h1 { margin: 0; font-size: 1.55rem; }
+header p { margin: 4px 0 0; color: var(--muted); font-size: .9rem; }
+main { max-width: 760px; margin: auto; padding: 8px 12px 24px; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.22); }
+label { display: block; font-weight: 700; margin-bottom: 8px; }
+textarea, input, select {
+  width: 100%; background: #06111c; color: var(--text); border: 1px solid var(--border);
+  border-radius: 12px; padding: 13px; font-size: 1.05rem;
+}
+textarea { text-transform: uppercase; letter-spacing: .06em; resize: vertical; }
+button {
+  border: 0; border-radius: 12px; padding: 13px 16px; font-size: 1rem; font-weight: 800;
+  background: var(--accent); color: #16120a; min-height: 48px;
+}
+button:disabled { opacity: .4; }
+button.secondary { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
+button.compact { min-height: 38px; padding: 8px 11px; font-size: .85rem; }
+button.full { width: 100%; margin-top: 12px; }
+.buttonRow, .raceButtons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.hint, .warning { color: var(--muted); font-size: .86rem; line-height: 1.4; margin-top: 7px; }
+.warning { margin-top: 14px; text-align: center; }
+.hidden { display: none !important; }
+#messages { margin: 10px 0; min-height: 1.4em; }
+.error { color: var(--danger); }
+.success { color: var(--ok); }
+.courseList { padding-left: 0; list-style: none; display: grid; gap: 7px; }
+.courseList li {
+  display: grid; grid-template-columns: 44px 1fr 96px 36px; align-items: center;
+  background: #091a29; border: 1px solid var(--border); border-radius: 11px; padding: 8px;
+}
+.courseList .code { font-weight: 900; font-size: 1.1rem; color: var(--accent); }
+.courseList .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.courseList select { padding: 7px; font-size: .85rem; }
+.courseList button { min-height: 32px; padding: 5px; border-radius: 8px; background: transparent; color: var(--danger); }
+.settingsGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.settingsGrid label { font-size: .9rem; }
+details { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
+summary { font-weight: 800; cursor: pointer; margin-bottom: 10px; }
+.savedItem, .markItem {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 9px; border-bottom: 1px solid var(--border);
+}
+.savedItem button, .markItem button { min-height: 34px; padding: 6px 9px; font-size: .85rem; }
+.markResults { max-height: 300px; overflow: auto; margin-top: 8px; }
+.raceTop { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.status { color: var(--muted); font-size: .85rem; text-align: center; }
+.nextLabel { margin-top: 24px; text-align: center; color: var(--muted); letter-spacing: .18em; font-weight: 800; }
+.nextCode { font-size: clamp(4rem, 20vw, 8rem); text-align: center; font-weight: 950; line-height: .95; color: var(--accent); margin-top: 6px; }
+.nextName { text-align: center; font-size: clamp(1.3rem, 6vw, 2.2rem); font-weight: 850; min-height: 2.5em; }
+.roundingBadge { width: max-content; margin: 8px auto 16px; padding: 7px 12px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--border); font-weight: 900; }
+.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.metric { background: #06111c; border: 1px solid var(--border); border-radius: 14px; padding: 12px; text-align: center; }
+.metric span { display: block; color: var(--muted); font-size: .73rem; letter-spacing: .08em; font-weight: 800; }
+.metric strong { display: block; font-size: clamp(1.8rem, 9vw, 3rem); margin-top: 4px; }
+.legInfo { display: flex; justify-content: space-between; color: var(--muted); font-size: .86rem; margin: 13px 2px 0; gap: 10px; }
+@media (max-width: 460px) {
+  .settingsGrid { grid-template-columns: 1fr; }
+  .courseList li { grid-template-columns: 40px 1fr 86px 32px; font-size: .9rem; }
+}
