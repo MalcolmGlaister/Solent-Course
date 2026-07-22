@@ -9,6 +9,7 @@
   let deferredInstall = null;
   let wakeLock = null;
   let insideRadius = false;
+  let raceMode = "nav";
 
   const stateKey = "solentCourse.saved.v1";
 
@@ -26,6 +27,182 @@
     return { code: match[1], rounding: match[2] || match[3] || $("defaultRounding").value };
   }
 
+  function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+
+  function bounds(values, value) {
+    if (value <= values[0]) return [0, 0, 0];
+    if (value >= values[values.length - 1]) return [values.length - 1, values.length - 1, 0];
+    for (let i = 0; i < values.length - 1; i++) {
+      if (value >= values[i] && value <= values[i + 1]) {
+        return [i, i + 1, (value - values[i]) / (values[i + 1] - values[i])];
+      }
+    }
+  }
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  function windInterpolated(values, tws) {
+    const [lo, hi, t] = bounds(window.J109_POLAR.windSpeeds, tws);
+    return lerp(values[lo], values[hi], t);
+  }
+
+  function polarTarget(twa, tws) {
+    twa = clamp(Math.abs(Number(twa)), 0, 180);
+    tws = clamp(Number(tws), 6, 20);
+    const correction = clamp(Number($("polarCorrection").value || 100), 70, 120) / 100;
+    const beatAngle = windInterpolated(window.J109_POLAR.beatAngles, tws);
+    const beatSpeed = windInterpolated(window.J109_POLAR.beatSpeeds, tws);
+    const runAngle = windInterpolated(window.J109_POLAR.runAngles, tws);
+    const runSpeed = windInterpolated(window.J109_POLAR.runSpeeds, tws);
+
+    let speed;
+    if (twa <= beatAngle) {
+      speed = beatSpeed;
+    } else if (twa >= runAngle) {
+      speed = runSpeed;
+    } else {
+      const angleRows = [beatAngle, ...window.J109_POLAR.angles.filter(a => a > beatAngle && a < runAngle), runAngle];
+      const rowSpeeds = [beatSpeed, ...window.J109_POLAR.angles.filter(a => a > beatAngle && a < runAngle).map(a => windInterpolated(window.J109_POLAR.speeds[String(a)], tws)), runSpeed];
+      const [lo, hi, t] = bounds(angleRows, twa);
+      speed = lerp(rowSpeeds[lo], rowSpeeds[hi], t);
+    }
+    const optimumAngle = twa < 90 ? beatAngle : runAngle;
+    const optimumSpeed = twa < 90 ? beatSpeed : runSpeed;
+    return { speed: speed * correction, optimumAngle, optimumSpeed: optimumSpeed * correction };
+  }
+
+  function actualBoatSpeed() {
+    if ($("speedSource").value === "manual") return Number($("manualSpeed").value) || null;
+    return lastPosition?.speed !== null && lastPosition?.speed !== undefined ? lastPosition.speed * 1.943844 : null;
+  }
+
+  function updatePolarDisplays() {
+    const tws = Number($("raceTws")?.value || $("twsInput").value);
+    const twa = Number($("raceTwa")?.value || $("twaInput").value);
+    if (!Number.isFinite(tws) || !Number.isFinite(twa)) return;
+    const target = polarTarget(twa, tws);
+    const actual = actualBoatSpeed();
+    const targetVmg = Math.abs(target.speed * Math.cos(toRad(twa)));
+    const actualVmg = actual === null ? null : Math.abs(actual * Math.cos(toRad(twa)));
+    const pct = actual === null ? null : actual / target.speed * 100;
+
+    if ($("setupPolarPreview")) {
+      $("setupPolarPreview").innerHTML = `<b>Target ${target.speed.toFixed(2)} kt</b> at ${twa.toFixed(0)}° TWA in ${tws.toFixed(1)} kt TWS<br>` +
+        `Optimum ${twa < 90 ? "upwind" : "downwind"}: ${target.optimumAngle.toFixed(1)}° at ${target.optimumSpeed.toFixed(2)} kt`;
+    }
+    if ($("targetSpeed")) {
+      $("targetSpeed").textContent = target.speed.toFixed(2);
+      $("targetPercent").textContent = pct === null ? "—%" : `${Math.round(pct)}%`;
+      $("targetWind").textContent = `${tws.toFixed(1)} kt / ${twa.toFixed(0)}°`;
+      $("actualSpeed").textContent = actual === null ? "—" : `${actual.toFixed(2)} kt`;
+      $("optimumAngle").textContent = `${target.optimumAngle.toFixed(1)}°`;
+      $("optimumSpeed").textContent = `${target.optimumSpeed.toFixed(2)} kt`;
+      $("actualWindVmg").textContent = actualVmg === null ? "—" : `${actualVmg.toFixed(2)} kt`;
+      $("targetWindVmg").textContent = `${targetVmg.toFixed(2)} kt`;
+    }
+  }
+
+  function setRaceMode(mode) {
+    raceMode = mode;
+    $("navigationPanel").classList.toggle("hidden", mode !== "nav");
+    $("targetsPanel").classList.toggle("hidden", mode !== "targets");
+    $("mapPanel").classList.toggle("hidden", mode !== "map");
+    $("navModeBtn").className = mode === "nav" ? "modeActive" : "secondary";
+    $("targetModeBtn").className = mode === "targets" ? "modeActive" : "secondary";
+    $("mapModeBtn").className = mode === "map" ? "modeActive" : "secondary";
+    if (mode === "targets") updatePolarDisplays();
+    if (mode === "map") renderCourseMap();
+  }
+
+  function renderCourseMap() {
+    const svg = $("courseMap");
+    if (!svg) return;
+    svg.innerHTML = "";
+    $("mapCourseSummary").textContent = course.length ? course.map(x => x.code).join(" → ") : "No course loaded";
+
+    const NS = "http://www.w3.org/2000/svg";
+    const add = (tag, attrs = {}, text = "") => {
+      const el = document.createElementNS(NS, tag);
+      Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+      if (text) el.textContent = text;
+      svg.appendChild(el);
+      return el;
+    };
+
+    add("rect", { x: 0, y: 0, width: 700, height: 520, class: "mapSea" });
+    if (!course.length) {
+      add("text", { x: 350, y: 260, class: "mapGridLabel", "text-anchor": "middle" }, "Build a course to display it here");
+      return;
+    }
+
+    const points = course.map(m => ({ lat: m.lat, lon: m.lon }));
+    if (lastPosition) points.push({ lat: lastPosition.lat, lon: lastPosition.lon });
+    let minLat = Math.min(...points.map(p => p.lat));
+    let maxLat = Math.max(...points.map(p => p.lat));
+    let minLon = Math.min(...points.map(p => p.lon));
+    let maxLon = Math.max(...points.map(p => p.lon));
+    const latSpan = Math.max(maxLat - minLat, 0.035);
+    const lonSpan = Math.max(maxLon - minLon, 0.06);
+    minLat -= latSpan * 0.18; maxLat += latSpan * 0.18;
+    minLon -= lonSpan * 0.12; maxLon += lonSpan * 0.12;
+
+    const pad = { l: 58, r: 26, t: 30, b: 42 };
+    const width = 700 - pad.l - pad.r;
+    const height = 520 - pad.t - pad.b;
+    const midLat = (minLat + maxLat) / 2;
+    const cosLat = Math.cos(toRad(midLat));
+    const lonRange = (maxLon - minLon) * cosLat;
+    const latRange = maxLat - minLat;
+    const scale = Math.min(width / lonRange, height / latRange);
+    const usedW = lonRange * scale;
+    const usedH = latRange * scale;
+    const ox = pad.l + (width - usedW) / 2;
+    const oy = pad.t + (height - usedH) / 2;
+    const project = (lat, lon) => ({
+      x: ox + (lon - minLon) * cosLat * scale,
+      y: oy + (maxLat - lat) * scale
+    });
+
+    for (let i = 0; i <= 4; i++) {
+      const gx = ox + usedW * i / 4;
+      const gy = oy + usedH * i / 4;
+      add("line", { x1: gx, y1: oy, x2: gx, y2: oy + usedH, class: "mapGrid" });
+      add("line", { x1: ox, y1: gy, x2: ox + usedW, y2: gy, class: "mapGrid" });
+      const lon = minLon + (maxLon - minLon) * i / 4;
+      const lat = maxLat - (maxLat - minLat) * i / 4;
+      add("text", { x: gx, y: 505, class: "mapGridLabel", "text-anchor": "middle" }, `${Math.abs(lon).toFixed(2)}°${lon < 0 ? "W" : "E"}`);
+      add("text", { x: 8, y: gy + 4, class: "mapGridLabel" }, `${lat.toFixed(2)}°N`);
+    }
+
+    add("text", { x: 665, y: 24, class: "mapNorth" }, "N");
+    add("path", { d: "M665 30 L657 48 L665 44 L673 48 Z", fill: "#9db1c2" });
+
+    const routePts = course.map(m => project(m.lat, m.lon));
+    if (routePts.length > 1) {
+      add("polyline", { points: routePts.map(p => `${p.x},${p.y}`).join(" "), class: "mapRoute" });
+      const from = currentLeg === 0 && lastPosition ? project(lastPosition.lat, lastPosition.lon) : routePts[Math.max(0, currentLeg - 1)];
+      const to = routePts[currentLeg];
+      if (from && to) add("line", { x1: from.x, y1: from.y, x2: to.x, y2: to.y, class: "mapActiveLeg" });
+    }
+
+    course.forEach((mark, i) => {
+      const p = routePts[i];
+      const cls = i < currentLeg ? "completed" : i === currentLeg ? "active" : "future";
+      add("circle", { cx: p.x, cy: p.y, r: i === currentLeg ? 13 : 11, class: `mapMarkCircle ${cls}` });
+      add("text", { x: p.x, y: p.y + 0.5, class: "mapOrderLabel" }, String(i + 1));
+      const anchor = p.x > 580 ? "end" : "start";
+      const dx = anchor === "end" ? -16 : 16;
+      add("text", { x: p.x + dx, y: p.y - 13, class: "mapMarkLabel", "text-anchor": anchor }, mark.code);
+    });
+
+    if (lastPosition) {
+      const b = project(lastPosition.lat, lastPosition.lon);
+      const heading = Number.isFinite(lastPosition.heading) ? lastPosition.heading : 0;
+      const boat = add("path", { d: "M0 -15 L10 12 L0 7 L-10 12 Z", class: "mapBoat", transform: `translate(${b.x} ${b.y}) rotate(${heading})` });
+      boat.setAttribute("aria-label", "Boat position");
+    }
+  }
+
   function buildCourse() {
     const tokens = normaliseTokens($("courseInput").value);
     const errors = [];
@@ -39,6 +216,7 @@
     }
     course = parsed;
     renderCourse();
+    renderCourseMap();
     if (errors.length) showMessage(errors.join(" · "), "error");
     else if (course.length) showMessage(`${course.length} marks loaded`, "success");
     else showMessage("Enter at least one mark code", "error");
@@ -62,6 +240,7 @@
       li.querySelector("button").addEventListener("click", () => {
         course.splice(i, 1);
         renderCourse();
+        renderCourseMap();
       });
       list.appendChild(li);
     });
@@ -84,7 +263,11 @@
     insideRadius = false;
     $("setupView").classList.add("hidden");
     $("raceView").classList.remove("hidden");
+    $("raceTws").value = $("twsInput").value;
+    $("raceTwa").value = $("twaInput").value;
+    setRaceMode("nav");
     updateRaceDisplay();
+    updatePolarDisplays();
     startGps();
   }
 
@@ -99,6 +282,8 @@
     $("prevBtn").disabled = currentLeg === 0;
     $("nextBtn").textContent = currentLeg === course.length - 1 ? "Finish ▶" : "Next mark ▶";
     if (lastPosition) updateNavigation(lastPosition);
+    updatePolarDisplays();
+    renderCourseMap();
   }
 
   function nextLeg() {
@@ -146,6 +331,7 @@
         };
         $("gpsStatus").textContent = `GPS ±${Math.round(pos.coords.accuracy)} m`;
         updateNavigation(lastPosition);
+        if (raceMode === "map") renderCourseMap();
       },
       err => $("gpsStatus").textContent = `GPS error: ${err.message}`,
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
@@ -200,6 +386,7 @@
 
     const speedKn = pos.speed !== null ? (pos.speed * 1.943844).toFixed(1) : "—";
     $("gpsDetail").textContent = `SOG ${speedKn} kt · ±${Math.round(pos.accuracy || 0)} m`;
+    updatePolarDisplays();
 
     const radius = Number($("autoRadius").value);
     if (radius > 0) {
@@ -217,6 +404,7 @@
     lastPosition = { lat: 50.7662, lon: -1.3005, speed: 3.2, heading: 260, accuracy: 5, timestamp: Date.now() };
     $("gpsStatus").textContent = "Demo position";
     updateNavigation(lastPosition);
+    renderCourseMap();
   }
 
   function saveCourse() {
@@ -246,6 +434,7 @@
         course = s.course.map(x => ({ ...marksByCode.get(x.code), rounding: x.rounding })).filter(x => x.code);
         $("courseInput").value = s.course.map(x => x.code + (x.rounding ? `(${x.rounding})` : "")).join(" ");
         renderCourse();
+        renderCourseMap();
       };
       div.querySelector("[data-del]").onclick = () => {
         saved.splice(idx, 1);
@@ -312,6 +501,18 @@
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") buildCourse();
   });
 
+  $("navModeBtn").onclick = () => setRaceMode("nav");
+  $("targetModeBtn").onclick = () => setRaceMode("targets");
+  $("mapModeBtn").onclick = () => setRaceMode("map");
+  $("fitMapBtn").onclick = renderCourseMap;
+  ["twsInput","twaInput","polarCorrection","manualSpeed"].forEach(id => $(id).addEventListener("input", updatePolarDisplays));
+  $("speedSource").addEventListener("change", () => {
+    $("manualSpeedLabel").classList.toggle("hidden", $("speedSource").value !== "manual");
+    updatePolarDisplays();
+  });
+  $("raceTws").addEventListener("input", () => { $("twsInput").value = $("raceTws").value; updatePolarDisplays(); });
+  $("raceTwa").addEventListener("input", () => { $("twaInput").value = $("raceTwa").value; updatePolarDisplays(); });
+
   window.addEventListener("beforeinstallprompt", e => {
     e.preventDefault(); deferredInstall = e; $("installBtn").classList.remove("hidden");
   });
@@ -329,4 +530,6 @@
 
   renderSaved();
   renderCourse();
+  updatePolarDisplays();
+  renderCourseMap();
 })();

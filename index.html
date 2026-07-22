@@ -16,7 +16,7 @@
   <header>
     <div>
       <h1>Solent Course</h1>
-      <p>Fast race-course entry and next-mark navigation</p>
+      <p>Course navigation and J/109 polar targets</p>
     </div>
     <button id="installBtn" class="secondary hidden">Install</button>
   </header>
@@ -54,6 +54,29 @@
         </label>
       </div>
 
+      <details open>
+        <summary>J/109 polar targets</summary>
+        <div class="polarIntro">GBR 2192L baseline: J/109 OD, 104% jib, 108 m² asymmetric, deep keel.</div>
+        <div class="settingsGrid">
+          <label>True wind speed
+            <input id="twsInput" type="number" min="1" max="40" step="0.1" value="12">
+          </label>
+          <label>True wind angle
+            <input id="twaInput" type="number" min="0" max="180" step="1" value="45">
+          </label>
+          <label>Polar correction
+            <input id="polarCorrection" type="number" min="70" max="120" step="1" value="100">
+          </label>
+          <label>Actual-speed source
+            <select id="speedSource"><option value="sog">GPS SOG</option><option value="manual">Manual boat speed</option></select>
+          </label>
+          <label id="manualSpeedLabel" class="hidden">Manual boat speed
+            <input id="manualSpeed" type="number" min="0" max="20" step="0.1" value="6.0">
+          </label>
+        </div>
+        <div id="setupPolarPreview" class="polarPreview"></div>
+      </details>
+
       <div class="buttonRow">
         <button id="startBtn" disabled>Start course</button>
         <button id="saveBtn" class="secondary" disabled>Save</button>
@@ -78,6 +101,13 @@
         <button id="wakeBtn" class="secondary compact">Keep awake</button>
       </div>
 
+      <div class="modeTabs">
+        <button id="navModeBtn" class="modeActive">Navigation</button>
+        <button id="targetModeBtn" class="secondary">Targets</button>
+        <button id="mapModeBtn" class="secondary">Map</button>
+      </div>
+
+      <div id="navigationPanel">
       <div class="nextLabel">NEXT MARK</div>
       <div id="nextCode" class="nextCode">—</div>
       <div id="nextName" class="nextName">—</div>
@@ -102,6 +132,48 @@
         </div>
       </div>
 
+      </div>
+
+      <div id="targetsPanel" class="hidden">
+        <div class="nextLabel">J/109 POLAR TARGET</div>
+        <div class="targetHero"><span id="targetSpeed">—</span><small>kt</small></div>
+        <div class="targetPercent" id="targetPercent">—%</div>
+        <div class="metrics">
+          <div class="metric"><span>TRUE WIND</span><strong id="targetWind">—</strong></div>
+          <div class="metric"><span>ACTUAL SPEED</span><strong id="actualSpeed">—</strong></div>
+          <div class="metric"><span>OPTIMUM ANGLE</span><strong id="optimumAngle">—</strong></div>
+          <div class="metric"><span>OPTIMUM SPEED</span><strong id="optimumSpeed">—</strong></div>
+          <div class="metric"><span>ACTUAL WIND VMG</span><strong id="actualWindVmg">—</strong></div>
+          <div class="metric"><span>TARGET WIND VMG</span><strong id="targetWindVmg">—</strong></div>
+        </div>
+        <div class="liveWindInputs">
+          <label>TWS <input id="raceTws" type="number" min="1" max="40" step="0.1"></label>
+          <label>TWA <input id="raceTwa" type="number" min="0" max="180" step="1"></label>
+        </div>
+        <div class="hint center">Until instrument integration is added, TWS and TWA are entered manually. Performance uses GPS SOG unless manual speed is selected.</div>
+      </div>
+
+
+      <div id="mapPanel" class="hidden">
+        <div class="mapHeader">
+          <div>
+            <div class="nextLabel mapLabel">COURSE MAP</div>
+            <div id="mapCourseSummary" class="mapCourseSummary">—</div>
+          </div>
+          <button id="fitMapBtn" class="secondary compact">Fit course</button>
+        </div>
+        <div class="courseMapWrap">
+          <svg id="courseMap" class="courseMap" viewBox="0 0 700 520" role="img" aria-label="Simplified map of the selected Solent race course"></svg>
+        </div>
+        <div class="mapLegend">
+          <span><i class="legendDot completed"></i>Passed</span>
+          <span><i class="legendDot active"></i>Next mark</span>
+          <span><i class="legendDot future"></i>Future</span>
+          <span><i class="legendBoat"></i>Boat</span>
+        </div>
+        <div class="hint center">Simplified course plot using official mark coordinates. Not a navigational chart.</div>
+      </div>
+
       <div class="legInfo">
         <span id="legCounter">Leg —</span>
         <span id="gpsDetail">No GPS fix</span>
@@ -118,6 +190,7 @@
   </main>
 
   <script src="marks.js"></script>
+  <script src="polar.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

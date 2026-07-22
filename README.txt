@@ -33,3 +33,22 @@ notices to mariners or maintaining a proper lookout.
 Data source
 -----------
 SCRA Solent Area Mark Codes 2026, dated 23 February 2026.
+
+
+V2 POLAR TARGETS
+----------------
+- Adds J/109 One-Design reference polar targets for GBR 2192L.
+- Reference configuration: 104% jib, 108 m2 asymmetric, deep keel.
+- Source: ORC IMS 2004 VPP dated 19 December 2003.
+- Manual TWS/TWA input, target speed interpolation, optimum beat/run targets,
+  target percentage and wind VMG.
+- GPS SOG is not speed through water, so tide affects performance percentage.
+- These are reference VPP targets, not a boat-specific measured polar.
+
+
+VERSION 3 MAP
+- Adds a third race display mode: Map.
+- Automatically fits the selected course.
+- Shows course order, active leg, passed/future marks and GPS boat position.
+- Uses official race-mark coordinates and works offline.
+- The display is a simplified course plot, not a navigational chart.
