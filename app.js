@@ -10,6 +10,10 @@
   let wakeLock = null;
   let insideRadius = false;
   let raceMode = "nav";
+  const RYS_LINES = {
+    "rys-inner": { name: "RYS Inner Line", a: {lat:50.76608, lon:-1.30123}, b:{lat:50.75940, lon:-1.29938}, approximate:true },
+    "rys-outer": { name: "RYS Outer Line", a: {lat:50.7866667, lon:-1.3091667}, b:{lat:50.76608, lon:-1.30123}, approximate:true }
+  };
 
   const stateKey = "solentCourse.saved.v1";
 
@@ -102,6 +106,31 @@
     }
   }
 
+
+  function lineFromControls(prefix) {
+    const type = $(prefix + "LineType").value;
+    if (type === "none") return null;
+    if (type === "same") return lineFromControls("start");
+    if (RYS_LINES[type]) return { type, ...RYS_LINES[type] };
+    const nums = ["ALat","ALon","BLat","BLon"].map(s => Number($(prefix+s).value));
+    if (!nums.every(Number.isFinite)) return { type:"committee", name:"Committee boat line", invalid:true };
+    return { type:"committee", name:"Committee boat line", a:{lat:nums[0],lon:nums[1]}, b:{lat:nums[2],lon:nums[3]} };
+  }
+
+  function updateLineControls(prefix) {
+    const type = $(prefix + "LineType").value;
+    $(prefix + "LineCoords").classList.toggle("hidden", type !== "committee");
+    const line = lineFromControls(prefix);
+    const summary = $(prefix + "LineSummary");
+    if (type === "same") summary.textContent = "Same as start line";
+    else if (!line) summary.textContent = `No ${prefix} line`;
+    else if (line.invalid) summary.textContent = "Enter both ends of the committee boat line";
+    else summary.textContent = `${line.name}${line.approximate ? " · approximate reference" : ""}`;
+    renderCourseMap();
+  }
+
+  function lineData() { return { start: lineFromControls("start"), finish: lineFromControls("finish") }; }
+
   function setRaceMode(mode) {
     raceMode = mode;
     $("navigationPanel").classList.toggle("hidden", mode !== "nav");
@@ -118,7 +147,7 @@
     const svg = $("courseMap");
     if (!svg) return;
     svg.innerHTML = "";
-    $("mapCourseSummary").textContent = course.length ? course.map(x => x.code).join(" → ") : "No course loaded";
+    $("mapCourseSummary").textContent = course.length ? `START → ${course.map(x => x.code).join(" → ")} → FINISH` : "No course loaded";
 
     const NS = "http://www.w3.org/2000/svg";
     const add = (tag, attrs = {}, text = "") => {
@@ -136,6 +165,8 @@
     }
 
     const points = course.map(m => ({ lat: m.lat, lon: m.lon }));
+    const lines = lineData();
+    [lines.start, lines.finish].forEach(line => { if (line && !line.invalid) points.push(line.a, line.b); });
     if (lastPosition) points.push({ lat: lastPosition.lat, lon: lastPosition.lon });
     let minLat = Math.min(...points.map(p => p.lat));
     let maxLat = Math.max(...points.map(p => p.lat));
@@ -176,6 +207,17 @@
 
     add("text", { x: 665, y: 24, class: "mapNorth" }, "N");
     add("path", { d: "M665 30 L657 48 L665 44 L673 48 Z", fill: "#9db1c2" });
+
+    const drawLine = (line, kind, label) => {
+      if (!line || line.invalid) return;
+      const a = project(line.a.lat, line.a.lon), b = project(line.b.lat, line.b.lon);
+      add("line", { x1:a.x, y1:a.y, x2:b.x, y2:b.y, class:`map${kind}Line` });
+      add("circle", { cx:a.x, cy:a.y, r:6, class:`mapLineEnd ${kind.toLowerCase()}` });
+      add("circle", { cx:b.x, cy:b.y, r:6, class:`mapLineEnd ${kind.toLowerCase()}` });
+      add("text", { x:(a.x+b.x)/2, y:(a.y+b.y)/2-10, class:"mapLineLabel", "text-anchor":"middle" }, label);
+    };
+    drawLine(lines.start, "Start", "START");
+    drawLine(lines.finish, "Finish", "FINISH");
 
     const routePts = course.map(m => project(m.lat, m.lon));
     if (routePts.length > 1) {
@@ -239,6 +281,7 @@
       li.querySelector("select").addEventListener("change", e => course[i].rounding = e.target.value);
       li.querySelector("button").addEventListener("click", () => {
         course.splice(i, 1);
+        applyLineSettings(s.lines);
         renderCourse();
         renderCourseMap();
       });
@@ -407,11 +450,31 @@
     renderCourseMap();
   }
 
+
+  function captureLineSettings() {
+    const out = {};
+    ["start","finish"].forEach(prefix => {
+      out[prefix] = { type: $(prefix+"LineType").value };
+      ["ALat","ALon","BLat","BLon"].forEach(s => out[prefix][s] = $(prefix+s).value);
+    });
+    return out;
+  }
+
+  function applyLineSettings(lines) {
+    if (!lines) return;
+    ["start","finish"].forEach(prefix => {
+      const v=lines[prefix]; if(!v) return;
+      $(prefix+"LineType").value=v.type;
+      ["ALat","ALon","BLat","BLon"].forEach(s => $(prefix+s).value=v[s]||"");
+      updateLineControls(prefix);
+    });
+  }
+
   function saveCourse() {
     const name = prompt("Course name", `Course ${new Date().toLocaleDateString()}`);
     if (!name) return;
     const saved = loadSaved();
-    saved.unshift({ name, course: course.map(x => ({ code: x.code, rounding: x.rounding })) });
+    saved.unshift({ name, course: course.map(x => ({ code: x.code, rounding: x.rounding })), lines: captureLineSettings() });
     localStorage.setItem(stateKey, JSON.stringify(saved.slice(0, 30)));
     renderSaved();
   }
@@ -487,6 +550,12 @@
     }
   }
 
+
+  ["start","finish"].forEach(prefix => {
+    $(prefix+"LineType").addEventListener("change", () => updateLineControls(prefix));
+    ["ALat","ALon","BLat","BLon"].forEach(s => $(prefix+s).addEventListener("input", () => updateLineControls(prefix)));
+  });
+
   $("parseBtn").onclick = buildCourse;
   $("clearBtn").onclick = () => { course=[]; $("courseInput").value=""; renderCourse(); showMessage(""); };
   $("startBtn").onclick = startCourse;
@@ -528,6 +597,8 @@
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js"));
   }
 
+  updateLineControls("start");
+  updateLineControls("finish");
   renderSaved();
   renderCourse();
   updatePolarDisplays();

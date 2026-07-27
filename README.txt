@@ -52,3 +52,14 @@ VERSION 3 MAP
 - Shows course order, active leg, passed/future marks and GPS boat position.
 - Uses official race-mark coordinates and works offline.
 - The display is a simplified course plot, not a navigational chart.
+
+
+VERSION 4 – START/FINISH LINES
+- RYS Inner Line preset (approximate plotting reference)
+- RYS Outer Line preset (Williams Shipping to Alpha reference)
+- Committee boat start/finish line using two editable lat/lon endpoints
+- Finish may reuse start line
+- Start and finish lines displayed on course map
+- Line settings stored with saved courses
+
+Always use current Sailing Instructions. Inflatable line marks can move; ping actual endpoints before relying on start-line calculations.
