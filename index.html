@@ -74,6 +74,11 @@
               <label>Committee boat longitude <input id="startALon" type="number" step="0.000001" placeholder="-1.300000"></label>
               <label>Outer end latitude <input id="startBLat" type="number" step="0.000001" placeholder="50.770000"></label>
               <label>Outer end longitude <input id="startBLon" type="number" step="0.000001" placeholder="-1.300000"></label>
+              <div class="pingRow">
+                <button id="pingStartA" type="button">Ping Committee Boat</button>
+                <button id="pingStartB" type="button" class="secondary">Ping Pin End</button>
+              </div>
+              <div id="startPingStatus" class="hint"></div>
             </div>
             <div id="startLineSummary" class="lineSummary">No start line</div>
           </fieldset>
@@ -93,11 +98,17 @@
               <label>Committee boat longitude <input id="finishALon" type="number" step="0.000001" placeholder="-1.300000"></label>
               <label>Outer end latitude <input id="finishBLat" type="number" step="0.000001" placeholder="50.770000"></label>
               <label>Outer end longitude <input id="finishBLon" type="number" step="0.000001" placeholder="-1.300000"></label>
+              <div class="pingRow">
+                <button id="pingFinishA" type="button">Ping Committee Boat</button>
+                <button id="pingFinishB" type="button" class="secondary">Ping Pin End</button>
+              </div>
+              <div id="finishPingStatus" class="hint"></div>
             </div>
             <div id="finishLineSummary" class="lineSummary">Same as start</div>
           </fieldset>
         </div>
         <div class="hint">RYS preset positions are approximate plotting references. Use the current sailing instructions and ping the actual line ends for start-line calculations.</div>
+        <div id="courseSequenceSummary" class="lineSummary">Course sequence: marks only</div>
       </details>
 
       <details open>

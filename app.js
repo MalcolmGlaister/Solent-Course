@@ -15,7 +15,7 @@
     "rys-outer": { name: "RYS Outer Line", a: {lat:50.7866667, lon:-1.3091667}, b:{lat:50.76608, lon:-1.30123}, approximate:true }
   };
 
-  const stateKey = "solentCourse.saved.v1";
+  const stateKey = "solentCourse.saved.v2";
 
   function normaliseTokens(text) {
     return text.toUpperCase()
@@ -126,10 +126,61 @@
     else if (!line) summary.textContent = `No ${prefix} line`;
     else if (line.invalid) summary.textContent = "Enter both ends of the committee boat line";
     else summary.textContent = `${line.name}${line.approximate ? " · approximate reference" : ""}`;
+    updateCourseSequenceSummary();
     renderCourseMap();
   }
 
   function lineData() { return { start: lineFromControls("start"), finish: lineFromControls("finish") }; }
+
+  function lineMidpoint(line) {
+    return { lat:(line.a.lat + line.b.lat)/2, lon:(line.a.lon + line.b.lon)/2 };
+  }
+
+  function courseSteps() {
+    const lines = lineData();
+    const steps = [];
+    if (lines.start && !lines.start.invalid) {
+      const p = lineMidpoint(lines.start);
+      steps.push({ kind:"start", code:"START", name:lines.start.name, lat:p.lat, lon:p.lon, rounding:"" });
+    }
+    course.forEach(mark => steps.push({ ...mark, kind:"mark" }));
+    if (lines.finish && !lines.finish.invalid) {
+      const p = lineMidpoint(lines.finish);
+      steps.push({ kind:"finish", code:"FINISH", name:lines.finish.name, lat:p.lat, lon:p.lon, rounding:"" });
+    }
+    return steps;
+  }
+
+  function updateCourseSequenceSummary() {
+    const steps = courseSteps();
+    const text = steps.length ? steps.map(s => s.code).join(" → ") : "marks only";
+    if ($("courseSequenceSummary")) $("courseSequenceSummary").textContent = `Course sequence: ${text}`;
+  }
+
+  function pingLineEnd(prefix, end) {
+    const status = $(prefix + "PingStatus");
+    if (!navigator.geolocation) {
+      status.textContent = "GPS is not available on this device.";
+      return;
+    }
+    status.textContent = end === "A" ? "Pinging committee boat…" : "Pinging pin end…";
+    navigator.geolocation.getCurrentPosition(pos => {
+      const lat = pos.coords.latitude.toFixed(6);
+      const lon = pos.coords.longitude.toFixed(6);
+      $(prefix + end + "Lat").value = lat;
+      $(prefix + end + "Lon").value = lon;
+      lastPosition = {
+        lat:pos.coords.latitude, lon:pos.coords.longitude,
+        speed:Number.isFinite(pos.coords.speed) ? pos.coords.speed : null,
+        heading:Number.isFinite(pos.coords.heading) ? pos.coords.heading : null,
+        accuracy:pos.coords.accuracy, timestamp:pos.timestamp
+      };
+      status.textContent = `${end === "A" ? "Committee boat" : "Pin end"} saved · ±${Math.round(pos.coords.accuracy || 0)} m`;
+      updateLineControls(prefix);
+    }, err => {
+      status.textContent = `GPS error: ${err.message}`;
+    }, { enableHighAccuracy:true, maximumAge:0, timeout:15000 });
+  }
 
   function setRaceMode(mode) {
     raceMode = mode;
@@ -147,7 +198,8 @@
     const svg = $("courseMap");
     if (!svg) return;
     svg.innerHTML = "";
-    $("mapCourseSummary").textContent = course.length ? `START → ${course.map(x => x.code).join(" → ")} → FINISH` : "No course loaded";
+    const steps = courseSteps();
+    $("mapCourseSummary").textContent = steps.length ? steps.map(x => x.code).join(" → ") : "No course loaded";
 
     const NS = "http://www.w3.org/2000/svg";
     const add = (tag, attrs = {}, text = "") => {
@@ -159,12 +211,12 @@
     };
 
     add("rect", { x: 0, y: 0, width: 700, height: 520, class: "mapSea" });
-    if (!course.length) {
+    if (!steps.length) {
       add("text", { x: 350, y: 260, class: "mapGridLabel", "text-anchor": "middle" }, "Build a course to display it here");
       return;
     }
 
-    const points = course.map(m => ({ lat: m.lat, lon: m.lon }));
+    const points = steps.map(m => ({ lat: m.lat, lon: m.lon }));
     const lines = lineData();
     [lines.start, lines.finish].forEach(line => { if (line && !line.invalid) points.push(line.a, line.b); });
     if (lastPosition) points.push({ lat: lastPosition.lat, lon: lastPosition.lon });
@@ -219,22 +271,25 @@
     drawLine(lines.start, "Start", "START");
     drawLine(lines.finish, "Finish", "FINISH");
 
-    const routePts = course.map(m => project(m.lat, m.lon));
+    const routePts = steps.map(m => project(m.lat, m.lon));
     if (routePts.length > 1) {
       add("polyline", { points: routePts.map(p => `${p.x},${p.y}`).join(" "), class: "mapRoute" });
-      const from = currentLeg === 0 && lastPosition ? project(lastPosition.lat, lastPosition.lon) : routePts[Math.max(0, currentLeg - 1)];
-      const to = routePts[currentLeg];
-      if (from && to) add("line", { x1: from.x, y1: from.y, x2: to.x, y2: to.y, class: "mapActiveLeg" });
     }
+    const from = currentLeg === 0 && lastPosition ? project(lastPosition.lat, lastPosition.lon) : routePts[Math.max(0, currentLeg - 1)];
+    const to = routePts[currentLeg];
+    if (from && to) add("line", { x1: from.x, y1: from.y, x2: to.x, y2: to.y, class: "mapActiveLeg" });
 
-    course.forEach((mark, i) => {
+    let markNumber = 0;
+    steps.forEach((step, i) => {
+      if (step.kind === "mark") markNumber++;
       const p = routePts[i];
       const cls = i < currentLeg ? "completed" : i === currentLeg ? "active" : "future";
-      add("circle", { cx: p.x, cy: p.y, r: i === currentLeg ? 13 : 11, class: `mapMarkCircle ${cls}` });
-      add("text", { x: p.x, y: p.y + 0.5, class: "mapOrderLabel" }, String(i + 1));
+      const radius = step.kind === "mark" ? (i === currentLeg ? 13 : 11) : (i === currentLeg ? 10 : 8);
+      add("circle", { cx: p.x, cy: p.y, r: radius, class: `mapMarkCircle ${cls}` });
+      add("text", { x: p.x, y: p.y + 0.5, class: "mapOrderLabel" }, step.kind === "mark" ? String(markNumber) : (step.kind === "start" ? "S" : "F"));
       const anchor = p.x > 580 ? "end" : "start";
       const dx = anchor === "end" ? -16 : 16;
-      add("text", { x: p.x + dx, y: p.y - 13, class: "mapMarkLabel", "text-anchor": anchor }, mark.code);
+      add("text", { x: p.x + dx, y: p.y - 13, class: "mapMarkLabel", "text-anchor": anchor }, step.code);
     });
 
     if (lastPosition) {
@@ -289,6 +344,7 @@
     });
     $("startBtn").disabled = !course.length;
     $("saveBtn").disabled = !course.length;
+    updateCourseSequenceSummary();
   }
 
   function showMessage(text, cls) {
@@ -315,22 +371,27 @@
   }
 
   function updateRaceDisplay() {
-    const mark = course[currentLeg];
+    const steps = courseSteps();
+    const mark = steps[currentLeg];
     if (!mark) return finishCourse();
     $("nextCode").textContent = mark.code;
     $("nextName").textContent = mark.name;
-    $("roundingBadge").textContent = mark.rounding === "P" ? "ROUND TO PORT" :
+    $("roundingBadge").textContent = mark.kind === "start" ? "CROSS START LINE" :
+      mark.kind === "finish" ? "CROSS FINISH LINE" :
+      mark.rounding === "P" ? "ROUND TO PORT" :
       mark.rounding === "S" ? "ROUND TO STARBOARD" : "ROUNDING UNSPECIFIED";
-    $("legCounter").textContent = `Leg ${currentLeg + 1} of ${course.length}`;
+    $("legCounter").textContent = `Step ${currentLeg + 1} of ${steps.length}`;
     $("prevBtn").disabled = currentLeg === 0;
-    $("nextBtn").textContent = currentLeg === course.length - 1 ? "Finish ▶" : "Next mark ▶";
+    $("nextBtn").textContent = currentLeg === steps.length - 1 ? "Complete course ▶" :
+      mark.kind === "start" ? "Start crossed ▶" : mark.kind === "finish" ? "Finish crossed ▶" : "Next mark ▶";
     if (lastPosition) updateNavigation(lastPosition);
     updatePolarDisplays();
     renderCourseMap();
   }
 
   function nextLeg() {
-    if (currentLeg < course.length - 1) {
+    const steps = courseSteps();
+    if (currentLeg < steps.length - 1) {
       currentLeg++;
       insideRadius = false;
       updateRaceDisplay();
@@ -403,7 +464,7 @@
   }
 
   function updateNavigation(pos) {
-    const mark = course[currentLeg];
+    const mark = courseSteps()[currentLeg];
     if (!mark) return;
     const nav = distanceBearing(pos.lat, pos.lon, mark.lat, mark.lon);
     const nm = nav.metres / 1852;
@@ -550,6 +611,11 @@
     }
   }
 
+
+  $("pingStartA").onclick = () => pingLineEnd("start", "A");
+  $("pingStartB").onclick = () => pingLineEnd("start", "B");
+  $("pingFinishA").onclick = () => pingLineEnd("finish", "A");
+  $("pingFinishB").onclick = () => pingLineEnd("finish", "B");
 
   ["start","finish"].forEach(prefix => {
     $(prefix+"LineType").addEventListener("change", () => updateLineControls(prefix));

@@ -63,3 +63,8 @@ VERSION 4 – START/FINISH LINES
 - Line settings stored with saved courses
 
 Always use current Sailing Instructions. Inflatable line marks can move; ping actual endpoints before relying on start-line calculations.
+
+VERSION 5
+- Ping Committee Boat and Ping Pin End buttons for committee-boat start and finish lines.
+- Start and finish are included as explicit navigation steps: START -> marks -> FINISH.
+- Line navigation initially targets the midpoint of each line; the full line remains drawn on the map.
